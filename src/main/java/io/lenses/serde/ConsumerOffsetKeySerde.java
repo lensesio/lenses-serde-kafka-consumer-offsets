@@ -67,6 +67,7 @@ public class ConsumerOffsetKeySerde implements Serde {
       }
 
       if (version == 2) {
+        buffer.rewind();
         final Either<Throwable, GroupMetadataKey> maybeGroupMetadataKey =
             GroupMetadataKey.from(buffer);
         if (maybeGroupMetadataKey.isLeft()) {

@@ -105,7 +105,7 @@ public class OffsetValue {
     if (version >= LOWEST_SUPPORTED_VERSION && version <= HIGHEST_SUPPORTED_VERSION) {
       final long offset = buffer.getLong();
       int leaderEpoch = -1;
-      if (version == 3) {
+      if (version >= 3) {
         leaderEpoch = buffer.getInt();
       }
       final short metadataLength = buffer.getShort();

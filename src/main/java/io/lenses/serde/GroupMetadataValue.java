@@ -105,6 +105,10 @@ public class GroupMetadataValue {
 
   public static Either<Throwable, GroupMetadataValue> from(ByteBuffer buffer) {
     final short version = buffer.getShort();
+    if (version < LOWEST_SUPPORTED_VERSION || version > HIGHEST_SUPPORTED_VERSION) {
+      return Either.left(
+          new RuntimeException("Invalid/Unsupported group metadata value version:" + version));
+    }
     final Either<Throwable, String> maybeProtocolType = readString(buffer, "protocolType");
     if (maybeProtocolType.isLeft()) {
       return Either.left(maybeProtocolType.getLeft());
@@ -113,18 +117,20 @@ public class GroupMetadataValue {
 
     final int generation = buffer.getInt();
 
-    final Either<Throwable, String> maybeProtocol = readString(buffer, "protocol");
+    final Either<Throwable, String> maybeProtocol = readStringAllowNull(buffer, "protocol");
     if (maybeProtocol.isLeft()) {
       return Either.left(maybeProtocol.getLeft());
     }
     final String protocol = maybeProtocol.getRight();
-    final Either<Throwable, String> maybeLeader = readString(buffer, "leader");
+
+    final Either<Throwable, String> maybeLeader = readStringAllowNull(buffer, "leader");
     if (maybeLeader.isLeft()) {
       return Either.left(maybeLeader.getLeft());
     }
     final String leader = maybeLeader.getRight();
 
     final long currentStateTimestamp = version >= 2 ? buffer.getLong() : -1L;
+
     final int arrayLength = buffer.getInt();
     if (arrayLength < 0) {
       return Either.left(new RuntimeException("non-nullable field members was serialized as null"));
@@ -157,6 +163,17 @@ public class GroupMetadataValue {
     if (length < 0) {
       return Either.left(
           new RuntimeException("non-nullable field " + field + " was serialized as null"));
+    } else {
+      final byte[] bytes = new byte[length];
+      buffer.get(bytes);
+      return Either.right(new String(bytes, StandardCharsets.UTF_8));
+    }
+  }
+
+  private static Either<Throwable, String> readStringAllowNull(ByteBuffer buffer, String field) {
+    final int length = buffer.getShort();
+    if (length < 0) {
+      return Either.right("");
     } else {
       final byte[] bytes = new byte[length];
       buffer.get(bytes);
@@ -300,21 +317,24 @@ public class GroupMetadataValue {
       final String memberId = maybeMemberId.getRight();
 
       final Either<Throwable, String> maybeGroupInstanceId =
-          version >= 3 ? readString(buffer, "groupInstanceId") : Either.right(null);
+          version >= 3 ? readStringAllowNull(buffer, "groupInstanceId") : Either.right(null);
       if (maybeGroupInstanceId.isLeft()) {
         return Either.left(maybeGroupInstanceId.getLeft());
       }
       final String groupInstanceId = maybeGroupInstanceId.getRight();
+
       final Either<Throwable, String> maybeClientId = readString(buffer, "clientId");
       if (maybeClientId.isLeft()) {
         return Either.left(maybeClientId.getLeft());
       }
       final String clientId = maybeClientId.getRight();
+
       final Either<Throwable, String> maybeClientHost = readString(buffer, "clientHost");
       if (maybeClientHost.isLeft()) {
         return Either.left(maybeClientHost.getLeft());
       }
       final String clientHost = maybeClientHost.getRight();
+
       final int rebalanceTimeout = version >= 1 ? buffer.getInt() : 0;
       final int sessionTimeout = buffer.getInt();
 
@@ -351,82 +371,6 @@ public class GroupMetadataValue {
         return Either.right(bytes);
       }
     }
-
-    /*public void read(Readable _readable, short _version) {
-        {
-            int length;
-            length = _readable.readShort();
-            if (length < 0) {
-                throw new RuntimeException("non-nullable field memberId was serialized as null");
-            } else if (length > 0x7fff) {
-                throw new RuntimeException("string field memberId had invalid length " + length);
-            } else {
-                this.memberId = _readable.readString(length);
-            }
-        }
-        if (_version >= 3) {
-            int length;
-            length = _readable.readShort();
-            if (length < 0) {
-                this.groupInstanceId = null;
-            } else if (length > 0x7fff) {
-                throw new RuntimeException("string field groupInstanceId had invalid length " + length);
-            } else {
-                this.groupInstanceId = _readable.readString(length);
-            }
-        } else {
-            this.groupInstanceId = null;
-        }
-        {
-            int length;
-            length = _readable.readShort();
-            if (length < 0) {
-                throw new RuntimeException("non-nullable field clientId was serialized as null");
-            } else if (length > 0x7fff) {
-                throw new RuntimeException("string field clientId had invalid length " + length);
-            } else {
-                this.clientId = _readable.readString(length);
-            }
-        }
-        {
-            int length;
-            length = _readable.readShort();
-            if (length < 0) {
-                throw new RuntimeException("non-nullable field clientHost was serialized as null");
-            } else if (length > 0x7fff) {
-                throw new RuntimeException("string field clientHost had invalid length " + length);
-            } else {
-                this.clientHost = _readable.readString(length);
-            }
-        }
-        if (_version >= 1) {
-            this.rebalanceTimeout = _readable.readInt();
-        } else {
-            this.rebalanceTimeout = 0;
-        }
-        this.sessionTimeout = _readable.readInt();
-        {
-            int length;
-            length = _readable.readInt();
-            if (length < 0) {
-                throw new RuntimeException("non-nullable field subscription was serialized as null");
-            } else {
-                byte[] newBytes = _readable.readArray(length);
-                this.subscription = newBytes;
-            }
-        }
-        {
-            int length;
-            length = _readable.readInt();
-            if (length < 0) {
-                throw new RuntimeException("non-nullable field assignment was serialized as null");
-            } else {
-                byte[] newBytes = _readable.readArray(length);
-                this.assignment = newBytes;
-            }
-        }
-        this._unknownTaggedFields = null;
-    }*/
 
     @Override
     public boolean equals(Object obj) {

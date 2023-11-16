@@ -50,7 +50,7 @@ public class OffsetKey {
 
   public GenericRecord toAvro() {
     GenericRecord record = new org.apache.avro.generic.GenericData.Record(Schema);
-    record.put("version", version);
+    record.put("version", (int) version);
 
     final GroupTopicPartition groupTopicPartition = key();
     final GenericRecord groupTopicPartitionRecord =

@@ -15,6 +15,7 @@ import com.landoop.lenses.lsql.serde.Serde;
 import com.landoop.lenses.lsql.serde.Serializer;
 import io.lenses.serde.utils.Either;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Properties;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -58,29 +59,45 @@ public class ConsumerOffsetValueSerde implements Serde {
       // to try to deserialize
       // the bytes as both types and return the one that succeeds.
       try {
-        final Either<Throwable, OffsetValue> maybeOffsetValue = OffsetValue.from(bytes);
-        if (maybeOffsetValue.isLeft()) {
-          final Either<Throwable, GroupMetadataValue> maybeGroupValue =
-              GroupMetadataValue.from(bytes);
-          if (maybeGroupValue.isLeft()) {
-            throw new IOException(
-                "Failed to deserialize bytes as OffsetValue or GroupMetadataValue",
-                maybeGroupValue.getLeft());
+        final ByteBuffer buffer = ByteBuffer.wrap(bytes);
+        final Either<Throwable, GroupMetadataValue> maybeGroupValue =
+            GroupMetadataValue.from(buffer);
+        if (maybeGroupValue.isLeft()) {
+          buffer.rewind();
+          final Either<Throwable, OffsetValue> maybeOffsetValue = OffsetValue.from(buffer);
+          if (maybeOffsetValue.isLeft()) {
+            throw new IOException(maybeOffsetValue.getLeft());
           } else {
-            return maybeGroupValue.getRight().toAvro();
+            if (buffer.remaining() > 0) {
+              throw new IOException("Bytes not fully consumed");
+            }
+            return maybeOffsetValue.getRight().toAvro();
           }
         } else {
-          return maybeOffsetValue.getRight().toAvro();
+          if (buffer.remaining() > 0) {
+            buffer.rewind();
+            final Either<Throwable, OffsetValue> maybeOffsetValue = OffsetValue.from(buffer);
+            if (maybeOffsetValue.isLeft()) {
+              throw new IOException(maybeOffsetValue.getLeft());
+            } else {
+              if (buffer.remaining() > 0) {
+                throw new IOException("Bytes not fully consumed");
+              }
+              return maybeOffsetValue.getRight().toAvro();
+            }
+          }
+          return maybeGroupValue.getRight().toAvro();
         }
       } catch (Exception e) {
-        final Either<Throwable, GroupMetadataValue> maybeGroupValue =
-            GroupMetadataValue.from(bytes);
-        if (maybeGroupValue.isLeft()) {
-          throw new IOException(
-              "Failed to deserialize bytes as OffsetValue or GroupMetadataValue",
-              maybeGroupValue.getLeft());
+        final ByteBuffer buffer = ByteBuffer.wrap(bytes);
+        final Either<Throwable, OffsetValue> maybeOffsetValue = OffsetValue.from(buffer);
+        if (maybeOffsetValue.isLeft()) {
+          throw new IOException(maybeOffsetValue.getLeft());
         } else {
-          return maybeGroupValue.getRight().toAvro();
+          if (buffer.remaining() > 0) {
+            throw new IOException("Bytes not fully consumed");
+          }
+          return maybeOffsetValue.getRight().toAvro();
         }
       }
     }
